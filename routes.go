@@ -7,7 +7,7 @@ import (
 )
 
 // find routes pointing out a specific interface
-func getRoute(ifName string) ([]*net.IPNet, error) {
+func getHostRoutesIpv6(ifName string) ([]*net.IPNet, error) {
 	nlh, err := netlink.NewHandle()
 	defer nlh.Delete()
 	if err != nil {

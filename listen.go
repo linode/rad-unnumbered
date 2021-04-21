@@ -27,7 +27,7 @@ func addTap(ctx context.Context, ifName string) {
 
 // trigger RAs based on interval and/or RS
 func listen(ctx context.Context, ifName string) error {
-	prefix, err := getRoute(ifName)
+	prefix, err := getHostRoutesIpv6(ifName)
 	if err != nil {
 		return fmt.Errorf("Failed getting routes for if %v: %v", ifName, err)
 	}
