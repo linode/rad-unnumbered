@@ -1,0 +1,21 @@
+Source: rad-unnumbered
+Section: extra
+Priority: extra
+Maintainer: tpaler <tpaler@linode.com>
+Build-Depends: debhelper (>= 7.0.0~)
+Standards-Version: 3.9.2
+Vcs-Browser: https://github.com/linode/rad-unnumbered
+Vcs-Git: https://github.com/linode/rad-unnumbered
+
+Package: rad-unnumbered
+Architecture: amd64
+Depends: 
+Provides: ${diverted-files}
+Conflicts: ${diverted-files}
+Description: rad helper for unnumbered tap
+  this tool will listen for netlink msgs and send IPv6
+  RA announcements based on the static /128 route pointing
+  to that tap interface. allowing a unknowing client to
+  self-configure using slaac on a unnumbered uplink
+  this however requires that the IP assigned is indeed
+  the slaac IP matching the clients MAC

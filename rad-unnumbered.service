@@ -1,0 +1,14 @@
+[Unit]
+Description=RAD unnumbered
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+EnvironmentFile=-/etc/default/rad-unnumbered
+ExecStart=/usr/sbin/rad-unnumbered ${OPT}
+StandardOutput=journal+console
+StandardError=journal+console
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
