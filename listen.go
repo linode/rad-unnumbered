@@ -27,15 +27,26 @@ func addTap(ctx context.Context, ifName string) {
 
 // trigger RAs based on interval and/or RS
 func listen(ctx context.Context, ifName string) error {
-	prefix, err := getHostRoutesIpv6(ifName)
+	prefix, subnets, err := getHostRoutesIpv6(ifName)
 	if err != nil {
 		return fmt.Errorf("Failed getting routes for if %v: %v", ifName, err)
 	}
 
-	ll.Debugf("routes found on %v: %v", ifName, prefix)
+	ll.Debugf("host routes found on %v: %v", ifName, prefix)
+	ll.Debugf("subnet routes found on %v: %v", ifName, subnets)
 
-	prefixMask := net.CIDRMask(64, 128)
-	prefixChosen := prefix[0].IP.Mask(prefixMask)
+	if prefix == nil && subnets == nil {
+		ll.Infof("neither host nor subnet routes to this tap. this may be a vlan interface, ignoring comletely")
+		return context.Canceled
+	}
+
+	var prefixChosen net.IP
+	if prefix != nil {
+		prefixMask := net.CIDRMask(64, 128)
+		prefixChosen = prefix[0].IP.Mask(prefixMask)
+	} else {
+		ll.Infof("no host routes on this interface, only advertising RA without prefix for SLAAC")
+	}
 	ll.Infof("Advertising %v: %v", ifName, prefixChosen)
 
 	ifi, err := net.InterfaceByName(ifName)
