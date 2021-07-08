@@ -1,2 +1,4 @@
 rad-unnumbered
 my-debhelper/
+dist/
+debian/changelog
