@@ -59,7 +59,7 @@ func listen(ctx context.Context, ifName string) error {
 	var c *ndp.Conn
 	var ip net.IP
 	for {
-		c, ip, err = ndp.Dial(ifi, ndp.LinkLocal)
+		c, ip, err = ndp.Listen(ifi, ndp.LinkLocal)
 		if err != nil {
 			ll.Warnf("unable to dial linklocal: %v, retrying...", err)
 			time.Sleep(1 * time.Second)
