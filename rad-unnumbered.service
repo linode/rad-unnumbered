@@ -5,7 +5,7 @@ After=network-online.target
 
 [Service]
 EnvironmentFile=-/etc/default/rad-unnumbered
-ExecStart=/usr/sbin/rad-unnumbered ${OPT}
+ExecStart=/usr/sbin/rad-unnumbered $RAD_UNNUMBERED_OPT
 Restart=on-failure
 
 [Install]
