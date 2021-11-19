@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/vishvananda/netlink"
 	"net"
+
+	"github.com/vishvananda/netlink"
 )
 
-// find routes pointing out a specific interface
+// getHostRoutesIpv6 finds all routes for a interfaces and returns them broken out in host routes and subnet routes
 func getHostRoutesIpv6(ifName string) ([]*net.IPNet, []*net.IPNet, error) {
 	nlh, err := netlink.NewHandle()
 	defer nlh.Delete()
@@ -29,7 +30,7 @@ func getHostRoutesIpv6(ifName string) ([]*net.IPNet, []*net.IPNet, error) {
 		m, l := d.Dst.Mask.Size()
 		if m == 128 && l == 128 {
 			hr = append(hr, d.Dst)
-		} else if l == 128 && !d.Dst.IP.Equal(net.ParseIP("fe80::")) {
+		} else if l == 128 && !d.Dst.IP.IsLinkLocalUnicast() {
 			sr = append(sr, d.Dst)
 		}
 	}

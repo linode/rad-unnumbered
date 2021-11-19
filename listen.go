@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/mdlayher/ndp"
-	ll "github.com/sirupsen/logrus"
 	"net"
 	"time"
+
+	"github.com/mdlayher/ndp"
+	ll "github.com/sirupsen/logrus"
 )
 
 // starts a RouteSolicitation listener on a tap. we need to respond to a rs right away when a linode comes up or is ready to configure it interface
@@ -29,7 +30,7 @@ func addTap(ctx context.Context, ifName string) {
 func listen(ctx context.Context, ifName string) error {
 	prefix, subnets, err := getHostRoutesIpv6(ifName)
 	if err != nil {
-		return fmt.Errorf("Failed getting routes for if %v: %v", ifName, err)
+		return fmt.Errorf("failed getting routes for if %v: %v", ifName, err)
 	}
 
 	ll.Debugf("host routes found on %v: %v", ifName, prefix)

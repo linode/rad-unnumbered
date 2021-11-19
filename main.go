@@ -63,15 +63,7 @@ func main() {
 	ll.Infoln("starting up...")
 	ll.Infof("Setting log level to '%s'", ll.GetLevel())
 
-	linksFeed := make(chan netlink.LinkUpdate)
-	linksDone := make(chan struct{})
-	err := netlink.LinkSubscribe(linksFeed, linksDone)
-	if err != nil {
-		ll.Fatalf("unable to open netlink feed: %v", err)
-	}
-
-	var regex *regexp.Regexp
-	regex, err = regexp.Compile(*flagTapRegex)
+	regex, err := regexp.Compile(*flagTapRegex)
 	if err != nil {
 		ll.Fatalf("unable to parse interface regex: %s", "test")
 	}
@@ -80,7 +72,19 @@ func main() {
 	ll.Infof("Sending RAs valid for %v every %v", *flagLifeTime, *flagInterval)
 
 	if flagLifeTime.Seconds() < 3*(flagInterval.Seconds()) {
-		ll.Warnf("WARN: lifetime (%v) should be at least 3*interval (%v), I hope you know what you're doing...", *flagLifeTime, *flagInterval)
+		ll.Warnf(
+			"WARN: lifetime (%v) should be at least 3*interval (%v), I hope you know what you're doing...",
+			*flagLifeTime,
+			*flagInterval,
+		)
+	}
+
+	linksFeed := make(chan netlink.LinkUpdate)
+	linksDone := make(chan struct{})
+
+	err = netlink.LinkSubscribe(linksFeed, linksDone)
+	if err != nil {
+		ll.Fatalf("unable to open netlink feed: %v", err)
 	}
 
 	// get existing list of links, in case we startup when vms are already active
@@ -99,12 +103,11 @@ func main() {
 			continue
 		}
 
-		if link.Attrs().OperState == 6 && link.Attrs().Flags&net.FlagUp == net.FlagUp && link.Attrs().OperState == 6 {
+		if link.Attrs().OperState == 6 && link.Attrs().Flags&net.FlagUp == net.FlagUp {
 			ll.Infof("adding existing link: %v", ifName)
 			ctx, cancel := context.WithCancel(context.Background())
 			addTap(ctx, ifName)
 			taps[ifName] = tapRA{ctx: ctx, cancel: cancel}
-			defer cancel()
 		}
 	}
 
@@ -131,7 +134,6 @@ func main() {
 				ctx, cancel := context.WithCancel(context.Background())
 				addTap(ctx, ifName)
 				taps[ifName] = tapRA{ctx: ctx, cancel: cancel}
-				defer cancel()
 			} else if tapExists && link.Attrs().OperState != 6 {
 				ll.Infof("removing link: %v", ifName)
 				taps[ifName].cancel()
