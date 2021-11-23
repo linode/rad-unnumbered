@@ -22,7 +22,7 @@ func (t Tap) doRA(c *ndp.Conn) error {
 }
 
 func (t Tap) sendLoop(ctx context.Context, c *ndp.Conn) error {
-	p := &ndp.PrefixInformation{}
+	var p *ndp.PrefixInformation
 	if t.Prefix != nil {
 		p = &ndp.PrefixInformation{
 			PrefixLength:                   64,

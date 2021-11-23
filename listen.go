@@ -166,6 +166,7 @@ func (t Tap) Listen() error {
 	defer c.Close()
 
 	f := &ipv6.ICMPFilter{}
+	f.SetAll(true)
 	f.Accept(ipv6.ICMPTypeRouterSolicitation)
 	if err := c.SetICMPFilter(f); err != nil {
 		return fmt.Errorf("failed to apply ICMP type filter: %v", err)
