@@ -22,29 +22,33 @@ func (t Tap) doRA(c *ndp.Conn) error {
 }
 
 func (t Tap) sendLoop(ctx context.Context, c *ndp.Conn) error {
+	p := &ndp.PrefixInformation{}
+	if t.Prefix != nil {
+		p = &ndp.PrefixInformation{
+			PrefixLength:                   64,
+			AutonomousAddressConfiguration: true,
+			ValidLifetime:                  3 * *flagLifeTime,
+			PreferredLifetime:              *flagLifeTime,
+			Prefix:                         t.Prefix,
+		}
+	}
+
 	m := &ndp.RouterAdvertisement{
 		CurrentHopLimit:           64,
 		RouterSelectionPreference: ndp.Medium,
 		RouterLifetime:            *flagLifeTime,
 		Options: []ndp.Option{
-			&ndp.PrefixInformation{
-				PrefixLength:                   64,
-				AutonomousAddressConfiguration: true,
-				ValidLifetime:                  3 * *flagLifeTime,
-				PreferredLifetime:              *flagLifeTime,
-				Prefix:                         t.Prefix,
-			},
 			&ndp.LinkLayerAddress{
 				Direction: ndp.Source,
 				Addr:      t.Ifi.HardwareAddr,
 			},
 			ndp.NewMTU(uint32(t.Ifi.MTU)),
+			p,
 		},
 	}
 
 	// Send messages until cancelation or error.
 	for {
-		//ll.Debugf("sending RA")
 		ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Debugf("%s RA sent: %s", t.Ifi.Name, t.Prefix)
 		if err := c.WriteTo(m, nil, net.IPv6linklocalallnodes); err != nil {
 			return fmt.Errorf("failed to send router advertisement: %v", err)

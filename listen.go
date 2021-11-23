@@ -30,7 +30,8 @@ func NewEngine() *Engine {
 func (e *Engine) Add(ifIdx int) {
 	t, err := NewTap(ifIdx)
 	if err != nil {
-		ll.Errorf("failed adding ifIndex %d: %s", ifIdx, err)
+		ll.WithFields(ll.Fields{"InterfaceID": ifIdx}).Errorf("failed adding ifIndex %d: %s", ifIdx, err)
+		return
 	}
 
 	ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Infof("%s found: %v", t.Ifi.Name, t.Prefix)
@@ -43,9 +44,9 @@ func (e *Engine) Add(ifIdx int) {
 		if err := t.Listen(); err != nil {
 			// Context cancel means a signal was sent, so no need to log an error.
 			if err == context.Canceled {
-				ll.Infof("%s closed", t.Ifi.Name)
+				ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Infof("%s closed", t.Ifi.Name)
 			} else {
-				ll.Errorf("%s failed with %s", t.Ifi.Name, err)
+				ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Errorf("%s failed with %s", t.Ifi.Name, err)
 			}
 			e.lock.Lock()
 			delete(e.tap, ifIdx)
@@ -103,8 +104,8 @@ func NewTap(idx int) (*Tap, error) {
 		return nil, fmt.Errorf("failed getting routes for if %v: %v", ifi.Name, err)
 	}
 
-	ll.Debugf("host routes found on %v: %v", ifi.Name, hostRoutes)
-	ll.Debugf("subnet routes found on %v: %v", ifi.Name, subnets)
+	ll.WithFields(ll.Fields{"Interface": ifi.Name}).Debugf("host routes found on %v: %v", ifi.Name, hostRoutes)
+	ll.WithFields(ll.Fields{"Interface": ifi.Name}).Debugf("subnet routes found on %v: %v", ifi.Name, subnets)
 
 	if hostRoutes == nil && subnets == nil {
 		return nil, fmt.Errorf(
