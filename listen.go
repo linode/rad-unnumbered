@@ -11,18 +11,21 @@ import (
 	ll "github.com/sirupsen/logrus"
 )
 
+// Engine is the main object collecting all running taps
 type Engine struct {
-	tap  map[int]*Tap
+	tap  map[int]Tap
 	lock sync.RWMutex
 }
 
+// NewEngine just setups up a empty new engine
 func NewEngine() *Engine {
 	return &Engine{
-		tap:  make(map[int]*Tap),
+		tap:  make(map[int]Tap),
 		lock: sync.RWMutex{},
 	}
 }
 
+// Add adds a new Interface to be handled by the engine
 func (e *Engine) Add(ifIdx int) {
 	t, err := NewTap(ifIdx)
 	if err != nil {
@@ -30,7 +33,7 @@ func (e *Engine) Add(ifIdx int) {
 	}
 
 	e.lock.Lock()
-	e.tap[ifIdx] = t
+	e.tap[ifIdx] = *t
 	e.lock.Unlock()
 
 	go func() {
@@ -52,9 +55,8 @@ func (e *Engine) Add(ifIdx int) {
 // Get returns a lookedup Tap interface thread safe
 func (e *Engine) Get(ifIdx int) Tap {
 	e.lock.RLock()
-	t := *e.tap[ifIdx]
-	e.lock.RUnlock()
-	return t
+	defer e.lock.RUnlock()
+	return e.tap[ifIdx]
 }
 
 // Check verifies (thread safe) if tap  is already handled or not
@@ -82,6 +84,7 @@ type Tap struct {
 	Prefix  net.IP
 	IPs     []*net.IPNet
 	Subnets []*net.IPNet
+	rs      chan struct{}
 }
 
 // NewTap finds, verifies and gets all aparms for a new Tap and returns the object

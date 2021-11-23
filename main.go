@@ -128,15 +128,16 @@ func main() {
 			}
 
 			tapExists := e.Check(link.Attrs().Index)
+			tapState := link.Attrs().OperState
 
-			if !tapExists && link.Attrs().OperState == 6 && link.Attrs().Statistics.TxPackets > 0 {
+			if !tapExists && tapState == 6 && link.Attrs().Statistics.TxPackets > 0 {
 				ll.Infof("adding new link: %v", ifName)
 				e.Add(link.Attrs().Index)
-			} else if tapExists && link.Attrs().OperState != 6 {
+			} else if tapExists && tapState != 6 {
 				ll.Infof("removing link: %v", ifName)
 				e.Close(link.Attrs().Index)
 			} else {
-				ll.Debugf("netlink fired for %s, but nothing to do?", ifName)
+				ll.Debugf("netlink fired for %s, Operstate: $s, but nothing to do?", ifName, tapState)
 			}
 		}
 	}
