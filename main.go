@@ -137,7 +137,7 @@ func main() {
 				ll.Infof("removing link: %v", ifName)
 				e.Close(link.Attrs().Index)
 			} else {
-				ll.Debugf("netlink fired for %s, Operstate: $s, but nothing to do?", ifName, tapState)
+				ll.Debugf("netlink fired for %s, Operstate: %s, but nothing to do?", ifName, tapState)
 			}
 		}
 	}

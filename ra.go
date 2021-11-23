@@ -8,6 +8,7 @@ import (
 
 	"github.com/mdlayher/ndp"
 	ll "github.com/sirupsen/logrus"
+	"golang.org/x/net/ipv6"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -51,17 +52,18 @@ func sendLoop(ctx context.Context, c *ndp.Conn, rs <-chan struct{}, addr net.Har
 
 	// Send messages until cancelation or error.
 	for {
+		//ll.Debugf("sending RA")
+		ll.Debugf("sending RA for %s to", prefix)
+		if err := c.WriteTo(m, nil, net.IPv6linklocalallnodes); err != nil {
+			return fmt.Errorf("failed to send router advertisement: %v", err)
+		}
+
 		select {
 		case <-ctx.Done():
 			return nil
 		// Trigger RA at regular intervals or on demand.
 		case <-time.After(*flagInterval):
 		case <-rs:
-		}
-
-		//ll.Debugf("sending RA")
-		if err := c.WriteTo(m, nil, net.IPv6linklocalallnodes); err != nil {
-			return fmt.Errorf("failed to send router advertisement: %v", err)
 		}
 	}
 }
@@ -99,12 +101,14 @@ func receiveRS(c *ndp.Conn) (ndp.Message, net.IP, error) {
 
 	msg, _, from, err := c.ReadFrom()
 	if err == nil {
-		if msg.Type() == 133 {
+		ll.Debugf("receive %d...", msg.Type())
+		if msg.Type() != ipv6.ICMPTypeRouterSolicitation {
 			// Read a message, but it isn't a router solicit.  Keep trying.
 			return nil, nil, errRetry
 		}
 
 		// Got a Solicit
+		ll.Debugf("received RS from %s", from)
 		return msg, from, nil
 	}
 
