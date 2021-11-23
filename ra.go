@@ -13,26 +13,6 @@ import (
 
 // sending the actual RA
 func doRA(ctx context.Context, c *ndp.Conn, addr net.HardwareAddr, prefix net.IP) error {
-
-	m := &ndp.RouterAdvertisement{
-		CurrentHopLimit:           64,
-		RouterSelectionPreference: ndp.Medium,
-		RouterLifetime:            *flagLifeTime,
-		Options: []ndp.Option{
-			&ndp.PrefixInformation{
-				PrefixLength:                   64,
-				AutonomousAddressConfiguration: true,
-				ValidLifetime:                  2 * *flagLifeTime,
-				PreferredLifetime:              *flagLifeTime,
-				Prefix:                         prefix,
-			},
-			&ndp.LinkLayerAddress{
-				Direction: ndp.Source,
-				Addr:      addr,
-			},
-		},
-	}
-
 	// Trigger an RA whenever an RS is received.
 	rs := make(chan struct{})
 
@@ -41,50 +21,78 @@ func doRA(ctx context.Context, c *ndp.Conn, addr net.HardwareAddr, prefix net.IP
 		return fmt.Errorf("failed to join multicast group: %v", err)
 	}
 
-	var eg errgroup.Group
-	eg.Go(func() error {
-		// Send messages until cancelation or error.
-		for {
-			//ll.Debugf("sending RA")
-			if err := c.WriteTo(m, nil, net.IPv6linklocalallnodes); err != nil {
-				return fmt.Errorf("failed to send router advertisement: %v", err)
-			}
-
-			select {
-			case <-ctx.Done():
-				return nil
-			// Trigger RA at regular intervals or on demand.
-			case <-time.After(*flagInterval):
-			case <-rs:
-			}
-		}
-	})
-
-	if err := receiveLoop(c, rs); err != nil {
-		return fmt.Errorf("failed to receive router solicitations: %v", err)
-	}
+	eg, ctxx := errgroup.WithContext(ctx)
+	eg.Go(func() error { return sendLoop(ctxx, c, rs, addr, prefix) })
+	eg.Go(func() error { return receiveLoop(ctxx, c, rs) })
 
 	return eg.Wait()
 }
 
-// check for RS to come in
-func receiveLoop(c *ndp.Conn, rs chan<- struct{}) error {
+func sendLoop(ctx context.Context, c *ndp.Conn, rs <-chan struct{}, addr net.HardwareAddr, prefix net.IP) error {
+	m := &ndp.RouterAdvertisement{
+		CurrentHopLimit:           64,
+		RouterSelectionPreference: ndp.Medium,
+		RouterLifetime:            *flagLifeTime,
+		Options: []ndp.Option{
+			&ndp.PrefixInformation{
+				PrefixLength:                   64,
+				AutonomousAddressConfiguration: true,
+				ValidLifetime:                  3 * *flagLifeTime,
+				PreferredLifetime:              *flagLifeTime,
+				Prefix:                         prefix,
+			},
+			&ndp.LinkLayerAddress{
+				Direction: ndp.Source,
+				Addr:      addr,
+			},
+			ndp.NewMTU(1500),
+		},
+	}
+
+	// Send messages until cancelation or error.
 	for {
-		msg, from, err := receive(c)
+		select {
+		case <-ctx.Done():
+			return nil
+		// Trigger RA at regular intervals or on demand.
+		case <-time.After(*flagInterval):
+		case <-rs:
+		}
+
+		//ll.Debugf("sending RA")
+		if err := c.WriteTo(m, nil, net.IPv6linklocalallnodes); err != nil {
+			return fmt.Errorf("failed to send router advertisement: %v", err)
+		}
+	}
+}
+
+// check for RS to come in
+func receiveLoop(ctx context.Context, c *ndp.Conn, rs chan<- struct{}) error {
+	count := 0
+	for {
+		msg, from, err := receiveRS(c)
 		switch err {
 		case errRetry:
 			continue
 		case nil:
+			count++
 			ll.Debugf("received %v from %v", msg.Type(), from)
 			rs <- struct{}{}
 		default:
 			return err
 		}
+
+		select {
+		case <-ctx.Done():
+			ll.Infof("done serving after %v RS", count)
+			return nil
+		default:
+		}
 	}
 }
 
 // if a RS hit, read it
-func receive(c *ndp.Conn) (ndp.Message, net.IP, error) {
+func receiveRS(c *ndp.Conn) (ndp.Message, net.IP, error) {
 	if err := c.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
 		return nil, nil, fmt.Errorf("failed to set deadline: %v", err)
 	}

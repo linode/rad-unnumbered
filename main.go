@@ -93,6 +93,8 @@ func main() {
 		ll.Fatalf("unable to get current list of links: %v", err)
 	}
 
+	e := NewEngine()
+
 	// when starting up making sure any already existing interfaces are being handled and started
 	for _, link := range t {
 
@@ -105,9 +107,7 @@ func main() {
 
 		if link.Attrs().OperState == 6 && link.Attrs().Flags&net.FlagUp == net.FlagUp {
 			ll.Infof("adding existing link: %v", ifName)
-			ctx, cancel := context.WithCancel(context.Background())
-			addTap(ctx, ifName)
-			taps[ifName] = tapRA{ctx: ctx, cancel: cancel}
+			e.Add(link.Attrs().Index)
 		}
 	}
 
@@ -127,17 +127,14 @@ func main() {
 				continue
 			}
 
-			_, tapExists := taps[ifName]
+			tapExists := e.Check(link.Attrs().Index)
 
 			if !tapExists && link.Attrs().OperState == 6 && link.Attrs().Statistics.TxPackets > 0 {
 				ll.Infof("adding new link: %v", ifName)
-				ctx, cancel := context.WithCancel(context.Background())
-				addTap(ctx, ifName)
-				taps[ifName] = tapRA{ctx: ctx, cancel: cancel}
+				e.Add(link.Attrs().Index)
 			} else if tapExists && link.Attrs().OperState != 6 {
 				ll.Infof("removing link: %v", ifName)
-				taps[ifName].cancel()
-				delete(taps, ifName)
+				e.Close(link.Attrs().Index)
 			} else {
 				ll.Debugf("netlink fired for %s, but nothing to do?", ifName)
 			}
