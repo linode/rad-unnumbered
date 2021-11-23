@@ -13,23 +13,15 @@ import (
 )
 
 // sending the actual RA
-func doRA(ctx context.Context, c *ndp.Conn, addr net.HardwareAddr, prefix net.IP) error {
-	// Trigger an RA whenever an RS is received.
-	rs := make(chan struct{})
-
-	// We are now a "router".
-	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
-		return fmt.Errorf("failed to join multicast group: %v", err)
-	}
-
-	eg, ctxx := errgroup.WithContext(ctx)
-	eg.Go(func() error { return sendLoop(ctxx, c, rs, addr, prefix) })
-	eg.Go(func() error { return receiveLoop(ctxx, c, rs) })
+func (t Tap) doRA(c *ndp.Conn) error {
+	eg, ctxx := errgroup.WithContext(t.ctx)
+	eg.Go(func() error { return t.sendLoop(ctxx, c) })
+	eg.Go(func() error { return t.receiveLoop(ctxx, c) })
 
 	return eg.Wait()
 }
 
-func sendLoop(ctx context.Context, c *ndp.Conn, rs <-chan struct{}, addr net.HardwareAddr, prefix net.IP) error {
+func (t Tap) sendLoop(ctx context.Context, c *ndp.Conn) error {
 	m := &ndp.RouterAdvertisement{
 		CurrentHopLimit:           64,
 		RouterSelectionPreference: ndp.Medium,
@@ -40,20 +32,20 @@ func sendLoop(ctx context.Context, c *ndp.Conn, rs <-chan struct{}, addr net.Har
 				AutonomousAddressConfiguration: true,
 				ValidLifetime:                  3 * *flagLifeTime,
 				PreferredLifetime:              *flagLifeTime,
-				Prefix:                         prefix,
+				Prefix:                         t.Prefix,
 			},
 			&ndp.LinkLayerAddress{
 				Direction: ndp.Source,
-				Addr:      addr,
+				Addr:      t.Ifi.HardwareAddr,
 			},
-			ndp.NewMTU(1500),
+			ndp.NewMTU(uint32(t.Ifi.MTU)),
 		},
 	}
 
 	// Send messages until cancelation or error.
 	for {
 		//ll.Debugf("sending RA")
-		ll.Debugf("sending RA for %s to", prefix)
+		ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Debugf("%s RA sent: %s", t.Ifi.Name, t.Prefix)
 		if err := c.WriteTo(m, nil, net.IPv6linklocalallnodes); err != nil {
 			return fmt.Errorf("failed to send router advertisement: %v", err)
 		}
@@ -63,30 +55,31 @@ func sendLoop(ctx context.Context, c *ndp.Conn, rs <-chan struct{}, addr net.Har
 			return nil
 		// Trigger RA at regular intervals or on demand.
 		case <-time.After(*flagInterval):
-		case <-rs:
+		case <-t.rs:
 		}
 	}
 }
 
 // check for RS to come in
-func receiveLoop(ctx context.Context, c *ndp.Conn, rs chan<- struct{}) error {
+func (t Tap) receiveLoop(ctx context.Context, c *ndp.Conn) error {
 	count := 0
 	for {
 		select {
 		case <-ctx.Done():
-			ll.Infof("done serving after %v RS", count)
+			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).
+				Debugf("%s listener closed, received: %03d RS", t.Ifi.Name, count)
 			return nil
 		default:
 		}
 
-		msg, from, err := receiveRS(c)
+		_, from, err := receiveRS(c)
 		switch err {
 		case errRetry:
 			continue
 		case nil:
 			count++
-			ll.Debugf("received %v from %v", msg.Type(), from)
-			rs <- struct{}{}
+			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Tracef("%s received RS from %s", t.Ifi.Name, from)
+			t.rs <- struct{}{}
 		default:
 			return err
 		}
@@ -101,14 +94,13 @@ func receiveRS(c *ndp.Conn) (ndp.Message, net.IP, error) {
 
 	msg, _, from, err := c.ReadFrom()
 	if err == nil {
-		ll.Debugf("receive %d...", msg.Type())
+		ll.Tracef("received %d...", msg.Type())
 		if msg.Type() != ipv6.ICMPTypeRouterSolicitation {
 			// Read a message, but it isn't a router solicit.  Keep trying.
 			return nil, nil, errRetry
 		}
 
 		// Got a Solicit
-		ll.Debugf("received RS from %s", from)
 		return msg, from, nil
 	}
 

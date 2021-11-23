@@ -9,6 +9,7 @@ import (
 
 	"github.com/mdlayher/ndp"
 	ll "github.com/sirupsen/logrus"
+	"golang.org/x/net/ipv6"
 )
 
 // Engine is the main object collecting all running taps
@@ -31,6 +32,8 @@ func (e *Engine) Add(ifIdx int) {
 	if err != nil {
 		ll.Errorf("failed adding ifIndex %d: %s", ifIdx, err)
 	}
+
+	ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Infof("%s found: %v", t.Ifi.Name, t.Prefix)
 
 	e.lock.Lock()
 	e.tap[ifIdx] = *t
@@ -120,8 +123,6 @@ func NewTap(idx int) (*Tap, error) {
 		prefixChosen = hostRoutes[0].IP.Mask(prefixMask)
 	}
 
-	ll.WithFields(ll.Fields{"Interface": ifi.Name}).Infof("%s found: %v", ifi.Name, prefixChosen)
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Tap{
@@ -131,6 +132,7 @@ func NewTap(idx int) (*Tap, error) {
 		Prefix:  prefixChosen,
 		IPs:     hostRoutes,
 		Subnets: subnets,
+		rs:      make(chan struct{}),
 	}, nil
 }
 
@@ -162,8 +164,19 @@ func (t Tap) Listen() error {
 	}
 	defer c.Close()
 
+	f := &ipv6.ICMPFilter{}
+	f.Accept(ipv6.ICMPTypeRouterSolicitation)
+	if err := c.SetICMPFilter(f); err != nil {
+		return fmt.Errorf("failed to apply ICMP type filter: %v", err)
+	}
+
+	// We are now a "router".
+	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
+		return fmt.Errorf("failed to join multicast group: %v", err)
+	}
+
 	ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).
 		Debugf("handling interface: %s, mac: %s, ip: %s", t.Ifi.Name, t.Ifi.HardwareAddr, ip)
 
-	return doRA(t.ctx, c, t.Ifi.HardwareAddr, t.Prefix)
+	return t.doRA(c)
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -17,10 +16,9 @@ import (
 var (
 	flagLogLevel = flag.String("loglevel", "info", fmt.Sprintf("Log level. One of %v", getLogLevels()))
 	flagTapRegex = flag.String("regex", "tap.*_0", "regex to match interfaces.")
-	flagLifeTime = flag.Duration("lifetime", (30 * time.Minute), "Lifetime.")
-	flagInterval = flag.Duration("interval", (10 * time.Minute), "Frequency of *un*solicitated RAs.")
+	flagLifeTime = flag.Duration("lifetime", (30 * time.Minute), "Lifetime (prefix valid time will be 3x lifetime).")
+	flagInterval = flag.Duration("interval", (5 * time.Minute), "Frequency of *un*solicitated RAs.")
 	errRetry     = errors.New("retry")
-	taps         = make(map[string]tapRA)
 )
 
 var logLevels = map[string]func(){
@@ -39,11 +37,6 @@ func getLogLevels() []string {
 		levels = append(levels, k)
 	}
 	return levels
-}
-
-type tapRA struct {
-	ctx    context.Context
-	cancel context.CancelFunc
 }
 
 func main() {
@@ -99,14 +92,15 @@ func main() {
 	for _, link := range t {
 
 		ifName := link.Attrs().Name
+		tapState := link.Attrs().OperState
 
 		if !(regex.Match([]byte(ifName))) {
 			ll.Debugf("%s did not match configured regex, skipping...", ifName)
 			continue
 		}
 
-		if link.Attrs().OperState == 6 && link.Attrs().Flags&net.FlagUp == net.FlagUp {
-			ll.Infof("adding existing link: %v", ifName)
+		if tapState == 6 && link.Attrs().Flags&net.FlagUp == net.FlagUp {
+			ll.Infof("adding existing link: %s", ifName)
 			e.Add(link.Attrs().Index)
 		}
 	}
@@ -118,8 +112,9 @@ func main() {
 			ll.Fatalln("netlink feed ended")
 		case link := <-linksFeed:
 			ifName := link.Attrs().Name
+			tapState := link.Attrs().OperState
 
-			ll.Debugf("Link: %v, admin: %v, state: %v", ifName, link.Attrs().Flags&net.FlagUp, link.Attrs().OperState)
+			ll.Debugf("Link: %v, admin: %v, state: %v", ifName, link.Attrs().Flags&net.FlagUp, tapState)
 			ll.Tracef("Stats: %v", *link.Attrs().Statistics)
 
 			if !(regex.Match([]byte(ifName))) {
@@ -128,7 +123,6 @@ func main() {
 			}
 
 			tapExists := e.Check(link.Attrs().Index)
-			tapState := link.Attrs().OperState
 
 			if !tapExists && tapState == 6 && link.Attrs().Statistics.TxPackets > 0 {
 				ll.Infof("adding new link: %v", ifName)
