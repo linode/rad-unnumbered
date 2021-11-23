@@ -79,7 +79,7 @@ func main() {
 		)
 	}
 
-	linksFeed := make(chan netlink.LinkUpdate)
+	linksFeed := make(chan netlink.LinkUpdate, 10)
 	linksDone := make(chan struct{})
 
 	err = netlink.LinkSubscribe(linksFeed, linksDone)

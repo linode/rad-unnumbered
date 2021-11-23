@@ -70,6 +70,13 @@ func sendLoop(ctx context.Context, c *ndp.Conn, rs <-chan struct{}, addr net.Har
 func receiveLoop(ctx context.Context, c *ndp.Conn, rs chan<- struct{}) error {
 	count := 0
 	for {
+		select {
+		case <-ctx.Done():
+			ll.Infof("done serving after %v RS", count)
+			return nil
+		default:
+		}
+
 		msg, from, err := receiveRS(c)
 		switch err {
 		case errRetry:
@@ -80,13 +87,6 @@ func receiveLoop(ctx context.Context, c *ndp.Conn, rs chan<- struct{}) error {
 			rs <- struct{}{}
 		default:
 			return err
-		}
-
-		select {
-		case <-ctx.Done():
-			ll.Infof("done serving after %v RS", count)
-			return nil
-		default:
 		}
 	}
 }
