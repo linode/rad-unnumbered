@@ -12,13 +12,13 @@ import (
 )
 
 type Engine struct {
-	tap  map[int]*tap
+	tap  map[int]*Tap
 	lock sync.RWMutex
 }
 
 func NewEngine() *Engine {
 	return &Engine{
-		tap:  make(map[int]*tap),
+		tap:  make(map[int]*Tap),
 		lock: sync.RWMutex{},
 	}
 }
@@ -49,13 +49,15 @@ func (e *Engine) Add(ifIdx int) {
 
 }
 
-func (e *Engine) Get(ifIdx int) *tap {
+// Get returns a lookedup Tap interface thread safe
+func (e *Engine) Get(ifIdx int) Tap {
 	e.lock.RLock()
-	t := e.tap[ifIdx]
+	t := *e.tap[ifIdx]
 	e.lock.RUnlock()
 	return t
 }
 
+// Check verifies (thread safe) if tap  is already handled or not
 func (e *Engine) Check(ifIdx int) bool {
 	e.lock.RLock()
 	_, exists := e.tap[ifIdx]
@@ -63,6 +65,7 @@ func (e *Engine) Check(ifIdx int) bool {
 	return exists
 }
 
+// Close stops handling a Tap interfaces and drops it from the map - thread safe
 func (e *Engine) Close(ifIdx int) {
 	e.tap[ifIdx].Cancel()
 	e.lock.Lock()
@@ -70,7 +73,8 @@ func (e *Engine) Close(ifIdx int) {
 	e.lock.Unlock()
 }
 
-type tap struct {
+// Tap is the interface object
+type Tap struct {
 	c       *ndp.Conn
 	Ifi     *net.Interface
 	ctx     context.Context
@@ -80,14 +84,15 @@ type tap struct {
 	Subnets []*net.IPNet
 }
 
-func NewTap(idx int) (*tap, error) {
+// NewTap finds, verifies and gets all aparms for a new Tap and returns the object
+func NewTap(idx int) (*Tap, error) {
 
 	ifi, err := net.InterfaceByIndex(idx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get interface: %v", err)
 	}
 
-	hostRoutes, subnets, err := getHostRoutesIpv6(ifi.Name)
+	hostRoutes, subnets, err := getHostRoutesIpv6(ifi.Index)
 	if err != nil {
 		return nil, fmt.Errorf("failed getting routes for if %v: %v", ifi.Name, err)
 	}
@@ -116,7 +121,7 @@ func NewTap(idx int) (*tap, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &tap{
+	return &Tap{
 		ctx:     ctx,
 		Cancel:  cancel,
 		Ifi:     ifi,
@@ -126,8 +131,8 @@ func NewTap(idx int) (*tap, error) {
 	}, nil
 }
 
-// trigger RAs based on interval and/or RS
-func (t tap) Listen() error {
+// Listen starts listening for RS on this tap and sends periodic RAs
+func (t Tap) Listen() error {
 	var c *ndp.Conn
 	var ip net.IP
 	var err error
