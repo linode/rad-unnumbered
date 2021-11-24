@@ -48,14 +48,18 @@ func (t Tap) sendLoop(ctx context.Context, c *ndp.Conn) error {
 	}
 
 	// Send messages until cancelation or error.
+	count := 0
 	for {
-		ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Debugf("%s RA sent: %s", t.Ifi.Name, t.Prefix)
+		ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Debugf("%s sent RA prefix %s", t.Ifi.Name, t.Prefix)
+		count++
 		if err := c.WriteTo(m, nil, net.IPv6linklocalallnodes); err != nil {
 			return fmt.Errorf("failed to send router advertisement: %v", err)
 		}
 
 		select {
 		case <-ctx.Done():
+			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).
+				Debugf("%s sender closed, sent: %d advertisements", t.Ifi.Name, count)
 			return nil
 		// Trigger RA at regular intervals or on demand.
 		case <-time.After(*flagInterval):
@@ -71,7 +75,7 @@ func (t Tap) receiveLoop(ctx context.Context, c *ndp.Conn) error {
 		select {
 		case <-ctx.Done():
 			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).
-				Debugf("%s listener closed, received: %03d RS", t.Ifi.Name, count)
+				Debugf("%s listener closed, received: %d solicits", t.Ifi.Name, count)
 			return nil
 		default:
 		}
@@ -82,7 +86,7 @@ func (t Tap) receiveLoop(ctx context.Context, c *ndp.Conn) error {
 			continue
 		case nil:
 			count++
-			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Tracef("%s received RS from %s", t.Ifi.Name, from)
+			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Debugf("%s received RS from %s", t.Ifi.Name, from)
 			t.rs <- struct{}{}
 		default:
 			return err
