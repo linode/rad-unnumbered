@@ -75,7 +75,8 @@ func (e *Engine) Check(ifIdx int) bool {
 // Close stops handling a Tap interfaces and drops it from the map - thread safe
 func (e *Engine) Close(ifIdx int) {
 	e.lock.Lock()
-	ll.WithFields(ll.Fields{"Interface": e.tap[ifIdx].Ifi.Name}).Infof("removing %s", ifName)
+	ifName := e.tap[ifIdx].Ifi.Name
+	ll.WithFields(ll.Fields{"Interface": ifName}).Infof("removing %s", ifName)
 	e.tap[ifIdx].Cancel()
 	delete(e.tap, ifIdx)
 	e.lock.Unlock()
@@ -151,7 +152,7 @@ func (t Tap) Listen() error {
 	for {
 		c, ip, err = ndp.Listen(t.Ifi, ndp.LinkLocal)
 		if err != nil {
-			ll.Warnf("unable to dial linklocal: %v, retrying...", err)
+			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Warnf("unable to dial linklocal: %s, retrying...", err)
 			time.Sleep(1 * time.Second)
 			// Was the context canceled already?
 			select {
@@ -161,7 +162,7 @@ func (t Tap) Listen() error {
 			default:
 			}
 		} else {
-			ll.Debugf("successfully dialed linklocal: %v", t.Ifi.Name)
+			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Debugf("successfully dialed linklocal: %v", t.Ifi.Name)
 			break
 		}
 	}
