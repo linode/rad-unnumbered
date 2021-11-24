@@ -13,14 +13,12 @@ import (
 
 // Tap is the interface object
 type Tap struct {
-	c       *ndp.Conn
-	Ifi     *net.Interface
-	ctx     context.Context
-	Close   context.CancelFunc
-	Prefix  net.IP
-	IPs     []*net.IPNet
-	Subnets []*net.IPNet
-	rs      chan struct{}
+	c      *ndp.Conn
+	Ifi    *net.Interface
+	ctx    context.Context
+	Close  context.CancelFunc
+	Prefix net.IP
+	rs     chan struct{}
 }
 
 // NewTap finds, verifies and gets all aparms for a new Tap and returns the object
@@ -59,13 +57,11 @@ func NewTap(idx int) (*Tap, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Tap{
-		ctx:     ctx,
-		Close:   cancel,
-		Ifi:     ifi,
-		Prefix:  prefixChosen,
-		IPs:     hostRoutes,
-		Subnets: subnets,
-		rs:      make(chan struct{}),
+		ctx:    ctx,
+		Close:  cancel,
+		Ifi:    ifi,
+		Prefix: prefixChosen,
+		rs:     make(chan struct{}),
 	}, nil
 }
 

@@ -31,8 +31,10 @@ func (e *Engine) Add(ifIdx int) {
 
 	ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Infof("adding %s with prefix %s", t.Ifi.Name, t.Prefix)
 
+	// need to lock/handle concurrency due to the cleanup inside the go routine
+	// eventually we could add some more logic to deal with on the fly route-changes by hooking into the routes channel
 	e.lock.Lock()
-	//assigning a copy to the map so I don't have to deal with concurrency
+	//assigning a copy to the map so I don't have to deal with concurrency while working with the tap itself
 	e.tap[ifIdx] = *t
 	e.lock.Unlock()
 
@@ -44,6 +46,8 @@ func (e *Engine) Add(ifIdx int) {
 			} else {
 				ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Errorf("%s failed with %s", t.Ifi.Name, err)
 			}
+
+			// cleanup after closing up
 			e.lock.Lock()
 			delete(e.tap, ifIdx)
 			e.lock.Unlock()
