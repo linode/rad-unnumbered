@@ -42,25 +42,24 @@ func getLogLevels() []string {
 func main() {
 	flag.Parse()
 
-	fn, ok := logLevels[*flagLogLevel]
-	if !ok {
-		ll.Fatalf("Invalid log level '%s'. Valid log levels are %v", *flagLogLevel, getLogLevels())
-	}
-	fn()
-
 	ll.SetFormatter(&ll.TextFormatter{
 		FullTimestamp: true,
 		PadLevelText:  true,
 	})
 
-	ll.Infoln("starting up...")
-	ll.Infof("Setting log level to '%s'", ll.GetLevel())
+	setlog, ok := logLevels[*flagLogLevel]
+	if !ok {
+		ll.Fatalf("Invalid log level '%s'. Valid log levels are %v", *flagLogLevel, getLogLevels())
+	}
+	setlog()
 
 	regex, err := regexp.Compile(*flagTapRegex)
 	if err != nil {
 		ll.Fatalf("unable to parse interface regex: %s", "test")
 	}
 
+	ll.Infoln("starting up...")
+	ll.Infof("Loglevel '%s'", ll.GetLevel())
 	ll.Infof("Handling Interfaces matching '%s'", regex.String())
 	ll.Infof("Sending RAs valid for %v every %v", *flagLifeTime, *flagInterval)
 
@@ -95,12 +94,12 @@ func main() {
 		tapState := link.Attrs().OperState
 
 		if !(regex.Match([]byte(ifName))) {
-			ll.Debugf("%s did not match configured regex, skipping...", ifName)
+			ll.WithFields(ll.Fields{"Interface": ifName}).
+				Debugf("%s did not match configured regex, skipping...", ifName)
 			continue
 		}
 
 		if tapState == 6 && link.Attrs().Flags&net.FlagUp == net.FlagUp {
-			ll.Infof("adding existing link: %s", ifName)
 			e.Add(link.Attrs().Index)
 		}
 	}
@@ -114,7 +113,7 @@ func main() {
 			ifName := link.Attrs().Name
 			tapState := link.Attrs().OperState
 
-			ll.Debugf("Link: %v, admin: %v, state: %v", ifName, link.Attrs().Flags&net.FlagUp, tapState)
+			ll.Tracef("Link: %v, admin: %v, state: %v", ifName, link.Attrs().Flags&net.FlagUp, tapState)
 			ll.Tracef("Stats: %v", *link.Attrs().Statistics)
 
 			if !(regex.Match([]byte(ifName))) {
@@ -125,13 +124,11 @@ func main() {
 			tapExists := e.Check(link.Attrs().Index)
 
 			if !tapExists && tapState == 6 && link.Attrs().Statistics.TxPackets > 0 {
-				ll.Infof("adding new link: %v", ifName)
 				e.Add(link.Attrs().Index)
 			} else if tapExists && tapState != 6 {
-				ll.Infof("removing link: %v", ifName)
 				e.Close(link.Attrs().Index)
 			} else {
-				ll.Debugf("netlink fired for %s, Operstate: %s, but nothing to do?", ifName, tapState)
+				ll.Tracef("netlink fired for %s, Operstate: %s, but nothing to do?", ifName, tapState)
 			}
 		}
 	}

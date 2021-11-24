@@ -34,9 +34,10 @@ func (e *Engine) Add(ifIdx int) {
 		return
 	}
 
-	ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Infof("%s found: %v", t.Ifi.Name, t.Prefix)
+	ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Infof("adding %s with prefix %s", t.Ifi.Name, t.Prefix)
 
 	e.lock.Lock()
+	//assigning a copy to the map so I don't have to deal with concurrency
 	e.tap[ifIdx] = *t
 	e.lock.Unlock()
 
@@ -73,8 +74,9 @@ func (e *Engine) Check(ifIdx int) bool {
 
 // Close stops handling a Tap interfaces and drops it from the map - thread safe
 func (e *Engine) Close(ifIdx int) {
-	e.tap[ifIdx].Cancel()
 	e.lock.Lock()
+	ll.WithFields(ll.Fields{"Interface": e.tap[ifIdx].Ifi.Name}).Infof("removing %s", ifName)
+	e.tap[ifIdx].Cancel()
 	delete(e.tap, ifIdx)
 	e.lock.Unlock()
 }
@@ -178,7 +180,7 @@ func (t Tap) Listen() error {
 	}
 
 	ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).
-		Debugf("handling interface: %s, mac: %s, ip: %s", t.Ifi.Name, t.Ifi.HardwareAddr, ip)
+		Debugf("handling interface: %s, mac: %s, src ip: %s", t.Ifi.Name, t.Ifi.HardwareAddr, ip)
 
 	return t.doRA(c)
 }
