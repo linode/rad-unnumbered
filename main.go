@@ -90,7 +90,7 @@ func main() {
 		ifName := link.Attrs().Name
 		tapState := link.Attrs().OperState
 
-		if e.Qualifies(ifName) {
+		if !e.Qualifies(ifName) {
 			ll.WithFields(ll.Fields{"Interface": ifName}).
 				Debugf("%s did not qualify, skipping...", ifName)
 			continue
@@ -110,10 +110,16 @@ func main() {
 			ifName := link.Attrs().Name
 			tapState := link.Attrs().OperState
 
-			ll.Tracef("Link: %v, admin: %v, state: %v", ifName, link.Attrs().Flags&net.FlagUp, tapState)
-			ll.Tracef("Stats: %v", *link.Attrs().Statistics)
+			ll.WithFields(ll.Fields{"Interface": ifName}).Tracef(
+				"Netlink fired: %v, admin: %v, OperState: %v, Rx/Tx: %v/%v",
+				ifName,
+				link.Attrs().Flags&net.FlagUp,
+				tapState,
+				link.Attrs().Statistics.RxPackets,
+				link.Attrs().Statistics.TxPackets,
+			)
 
-			if e.Qualifies(ifName) {
+			if !e.Qualifies(ifName) {
 				ll.WithFields(ll.Fields{"Interface": ifName}).
 					Debugf("%s did not qualify, skipping...", ifName)
 				continue
@@ -121,12 +127,15 @@ func main() {
 
 			tapExists := e.Exists(link.Attrs().Index)
 
+			// on upcoming interfaces I'm just waiting for the TX counter to count up 1
+			// not really needed but it just saves more errors and retries later on the socket binding in the tap.Listen call
+			// and doing it this way is actually faster and plays nice with live migrations
 			if !tapExists && tapState == 6 && link.Attrs().Statistics.TxPackets > 0 {
 				e.Add(link.Attrs().Index)
 			} else if tapExists && tapState != 6 {
 				e.Close(link.Attrs().Index)
 			} else {
-				ll.Tracef("netlink fired for %s, Operstate: %s, but nothing to do?", ifName, tapState)
+				ll.Tracef("%s Exists: %v, OperState: %s ... nothing to do?", ifName, tapExists, tapState)
 			}
 		}
 	}

@@ -74,11 +74,13 @@ func (t Tap) Listen() error {
 	// need this hacky loop since there are occasions where the OS seems to lock the tap for about 15sec (or sometimes longer)
 	// on innitial creation. causing the dialer to fail.
 	// this loop checks the context for cancellation but otherwise continues to re-try
+	counter := 0
 	for {
 		c, ip, err = ndp.Listen(t.Ifi, ndp.LinkLocal)
 		if err != nil {
-			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Warnf("unable to dial linklocal: %s, retrying...", err)
-			time.Sleep(1 * time.Second)
+			counter++
+			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).
+				Warnf("unable to dial linklocal: %s, retrying in 1s... %d", err, counter)
 			// Was the context canceled already?
 			select {
 			case <-t.ctx.Done():
@@ -86,6 +88,7 @@ func (t Tap) Listen() error {
 				//fmt.Errorf("got stopped by %v while still dialing %v", t.ctx.Err(), err)
 			default:
 			}
+			time.Sleep(1 * time.Second)
 		} else {
 			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).Debugf("successfully dialed linklocal: %v", t.Ifi.Name)
 			break
