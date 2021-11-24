@@ -8,6 +8,10 @@ import (
 )
 
 func linkReady(l *netlink.LinkAttrs) bool {
+	// on upcoming interfaces I'm just waiting for the TX counter to count up 1
+	// not really needed but it just saves more errors and retries later on the socket binding in the tap.Listen call
+	// this is due to the fact that the tap needs to give itself a ipv6 LL and do dad etc
+	// and doing it this way is actually faster and plays nice with live migrations
 	if l.OperState == 6 && l.Flags&net.FlagUp == net.FlagUp && l.Statistics.TxPackets > 0 {
 		return true
 	}
