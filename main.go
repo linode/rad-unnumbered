@@ -46,11 +46,11 @@ func main() {
 		PadLevelText:  true,
 	})
 
-	setlog, ok := logLevels[*flagLogLevel]
+	setlvl, ok := logLevels[*flagLogLevel]
 	if !ok {
 		ll.Fatalf("Invalid log level '%s'. Valid log levels are %v", *flagLogLevel, getLogLevels())
 	}
-	setlog()
+	setlvl()
 
 	ll.Infoln("starting up...")
 	ll.Infof("Loglevel '%s'", ll.GetLevel())
