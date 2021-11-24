@@ -54,7 +54,6 @@ func (e *Engine) Add(ifIdx int) {
 			e.lock.Unlock()
 		}
 	}()
-
 }
 
 // Get returns a lookedup Tap interface thread safe
@@ -74,12 +73,12 @@ func (e *Engine) Check(ifIdx int) bool {
 
 // Close stops handling a Tap interfaces and drops it from the map - thread safe
 func (e *Engine) Close(ifIdx int) {
-	e.lock.Lock()
-	ifName := e.tap[ifIdx].Ifi.Name
+	e.lock.RLock()
+	tap := e.tap[ifIdx]
+	e.lock.RUnlock()
+	ifName := tap.Ifi.Name
 	ll.WithFields(ll.Fields{"Interface": ifName}).Infof("removing %s", ifName)
-	e.tap[ifIdx].Cancel()
-	delete(e.tap, ifIdx)
-	e.lock.Unlock()
+	tap.Close()
 }
 
 // Tap is the interface object
@@ -87,7 +86,7 @@ type Tap struct {
 	c       *ndp.Conn
 	Ifi     *net.Interface
 	ctx     context.Context
-	Cancel  context.CancelFunc
+	Close   context.CancelFunc
 	Prefix  net.IP
 	IPs     []*net.IPNet
 	Subnets []*net.IPNet
@@ -131,7 +130,7 @@ func NewTap(idx int) (*Tap, error) {
 
 	return &Tap{
 		ctx:     ctx,
-		Cancel:  cancel,
+		Close:   cancel,
 		Ifi:     ifi,
 		Prefix:  prefixChosen,
 		IPs:     hostRoutes,

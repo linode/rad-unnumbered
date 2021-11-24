@@ -14,8 +14,6 @@ import (
 )
 
 var (
-	flagLogLevel = flag.String("loglevel", "info", fmt.Sprintf("Log level. One of %v", getLogLevels()))
-	flagTapRegex = flag.String("regex", "tap.*_0", "regex to match interfaces.")
 	flagLifeTime = flag.Duration("lifetime", (30 * time.Minute), "Lifetime (prefix valid time will be 3x lifetime).")
 	flagInterval = flag.Duration("interval", (5 * time.Minute), "Frequency of *un*solicitated RAs.")
 	errRetry     = errors.New("retry")
@@ -40,6 +38,8 @@ func getLogLevels() []string {
 }
 
 func main() {
+	flagLogLevel := flag.String("loglevel", "info", fmt.Sprintf("Log level. One of %v", getLogLevels()))
+	flagTapRegex := flag.String("regex", "tap.*_0", "regex to match interfaces.")
 	flag.Parse()
 
 	ll.SetFormatter(&ll.TextFormatter{
