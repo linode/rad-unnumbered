@@ -7,6 +7,13 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+func linkReady(l *netlink.LinkAttrs) bool {
+	if l.OperState == 6 && l.Flags&net.FlagUp == net.FlagUp && l.Statistics.TxPackets > 0 {
+		return true
+	}
+	return false
+}
+
 // getHostRoutesIpv6 finds all routes for a interfaces and returns them broken out in host routes and subnet routes
 func getHostRoutesIpv6(ifIdx int) ([]*net.IPNet, []*net.IPNet, error) {
 	nlh, err := netlink.NewHandle()

@@ -76,7 +76,7 @@ func (e *Engine) Get(ifIdx int) Tap {
 	return e.tap[ifIdx]
 }
 
-// Check verifies (thread safe) if tap  is already handled or not
+// Exists verifies (thread safe) if tap  is already handled or not
 func (e *Engine) Exists(ifIdx int) bool {
 	e.lock.RLock()
 	_, exists := e.tap[ifIdx]
