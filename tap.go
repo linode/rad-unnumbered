@@ -65,7 +65,7 @@ func NewTap(idx int) (*Tap, error) {
 	}, nil
 }
 
-// Listen starts listening for RS on this tap and sends periodic RAs
+// Listen starts listening for RouterSolicits on this tap and sends periodic RAs
 func (t Tap) Listen() error {
 	var c *ndp.Conn
 	var ip net.IP
@@ -93,6 +93,7 @@ func (t Tap) Listen() error {
 	}
 	defer c.Close()
 
+	// filter incoming ICMPs to be limited to RouterSolicits
 	f := &ipv6.ICMPFilter{}
 	f.SetAll(true)
 	f.Accept(ipv6.ICMPTypeRouterSolicitation)
@@ -100,7 +101,7 @@ func (t Tap) Listen() error {
 		return fmt.Errorf("failed to apply ICMP type filter: %v", err)
 	}
 
-	// We are now a "router".
+	// We are a "router", lets join the MC group
 	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
 		return fmt.Errorf("failed to join multicast group: %v", err)
 	}

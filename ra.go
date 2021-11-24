@@ -21,6 +21,7 @@ func (t Tap) doRA(c *ndp.Conn) error {
 	return eg.Wait()
 }
 
+// tiggers RouterAdvertisements every Interval duration or when a RouterSolicit was received on the interface
 func (t Tap) sendLoop(ctx context.Context, c *ndp.Conn) error {
 	var p *ndp.PrefixInformation
 	if t.Prefix != nil {
@@ -68,7 +69,7 @@ func (t Tap) sendLoop(ctx context.Context, c *ndp.Conn) error {
 	}
 }
 
-// check for RS to come in
+// receiveLoop endlessly checks for RouterSolicits while also checking if Context has been cancelled
 func (t Tap) receiveLoop(ctx context.Context, c *ndp.Conn) error {
 	count := 0
 	for {
@@ -94,7 +95,7 @@ func (t Tap) receiveLoop(ctx context.Context, c *ndp.Conn) error {
 	}
 }
 
-// if a RS hit, read it
+// receiveRS reads RouterSolicitsts but tries to keep it brief
 func receiveRS(c *ndp.Conn) (ndp.Message, net.IP, error) {
 	if err := c.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
 		return nil, nil, fmt.Errorf("failed to set deadline: %v", err)

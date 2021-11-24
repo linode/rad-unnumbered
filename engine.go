@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"sync"
 
 	ll "github.com/sirupsen/logrus"
@@ -9,16 +11,28 @@ import (
 
 // Engine is the main object collecting all running taps
 type Engine struct {
-	tap  map[int]Tap
-	lock sync.RWMutex
+	tap   map[int]Tap
+	lock  sync.RWMutex
+	regex *regexp.Regexp
 }
 
 // NewEngine just setups up a empty new engine
-func NewEngine() *Engine {
-	return &Engine{
-		tap:  make(map[int]Tap),
-		lock: sync.RWMutex{},
+func NewEngine(regex string) (*Engine, error) {
+	r, err := regexp.Compile(regex)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse interface regex %s: %w", regex, err)
 	}
+
+	return &Engine{
+		tap:   make(map[int]Tap),
+		lock:  sync.RWMutex{},
+		regex: r,
+	}, nil
+}
+
+// Qualifies checks if interface qulalifies, aka matches the regex for taps to be handled
+func (e *Engine) Qualifies(ifName string) bool {
+	return e.regex.Match([]byte(ifName))
 }
 
 // Add adds a new Interface to be handled by the engine
@@ -63,7 +77,7 @@ func (e *Engine) Get(ifIdx int) Tap {
 }
 
 // Check verifies (thread safe) if tap  is already handled or not
-func (e *Engine) Check(ifIdx int) bool {
+func (e *Engine) Exists(ifIdx int) bool {
 	e.lock.RLock()
 	_, exists := e.tap[ifIdx]
 	e.lock.RUnlock()

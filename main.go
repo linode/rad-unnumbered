@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"regexp"
 	"time"
 
 	ll "github.com/sirupsen/logrus"
@@ -53,15 +52,9 @@ func main() {
 	}
 	setlog()
 
-	regex, err := regexp.Compile(*flagTapRegex)
-	if err != nil {
-		ll.Fatalf("unable to parse interface regex: %s", "test")
-	}
-
 	ll.Infoln("starting up...")
 	ll.Infof("Loglevel '%s'", ll.GetLevel())
-	ll.Infof("Handling Interfaces matching '%s'", regex.String())
-	ll.Infof("Sending RAs valid for %v every %v", *flagLifeTime, *flagInterval)
+	ll.Infof("Sending RAs valid for %v every %v on interfaces matching %s", *flagLifeTime, *flagInterval, *flagTapRegex)
 
 	if flagLifeTime.Seconds() < 3*(flagInterval.Seconds()) {
 		ll.Warnf(
@@ -74,7 +67,8 @@ func main() {
 	linksFeed := make(chan netlink.LinkUpdate, 10)
 	linksDone := make(chan struct{})
 
-	err = netlink.LinkSubscribe(linksFeed, linksDone)
+	// lets hook into the netlink channel for push notifications from the kernel
+	err := netlink.LinkSubscribe(linksFeed, linksDone)
 	if err != nil {
 		ll.Fatalf("unable to open netlink feed: %v", err)
 	}
@@ -85,7 +79,10 @@ func main() {
 		ll.Fatalf("unable to get current list of links: %v", err)
 	}
 
-	e := NewEngine()
+	e, err := NewEngine(*flagTapRegex)
+	if err != nil {
+		ll.Fatalf("unable to get started: %v", err)
+	}
 
 	// when starting up making sure any already existing interfaces are being handled and started
 	for _, link := range t {
@@ -93,9 +90,9 @@ func main() {
 		ifName := link.Attrs().Name
 		tapState := link.Attrs().OperState
 
-		if !(regex.Match([]byte(ifName))) {
+		if e.Qualifies(ifName) {
 			ll.WithFields(ll.Fields{"Interface": ifName}).
-				Debugf("%s did not match configured regex, skipping...", ifName)
+				Debugf("%s did not qualify, skipping...", ifName)
 			continue
 		}
 
@@ -116,12 +113,13 @@ func main() {
 			ll.Tracef("Link: %v, admin: %v, state: %v", ifName, link.Attrs().Flags&net.FlagUp, tapState)
 			ll.Tracef("Stats: %v", *link.Attrs().Statistics)
 
-			if !(regex.Match([]byte(ifName))) {
-				ll.Debugf("%s did not match configured regex, skipping...", ifName)
+			if e.Qualifies(ifName) {
+				ll.WithFields(ll.Fields{"Interface": ifName}).
+					Debugf("%s did not qualify, skipping...", ifName)
 				continue
 			}
 
-			tapExists := e.Check(link.Attrs().Index)
+			tapExists := e.Exists(link.Attrs().Index)
 
 			if !tapExists && tapState == 6 && link.Attrs().Statistics.TxPackets > 0 {
 				e.Add(link.Attrs().Index)
