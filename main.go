@@ -109,6 +109,12 @@ func main() {
 			ifName := link.Attrs().Name
 			tapState := link.Attrs().OperState
 
+			if !e.Qualifies(ifName) {
+				ll.WithFields(ll.Fields{"Interface": ifName}).
+					Debugf("%s did not qualify, skipping...", ifName)
+				continue
+			}
+
 			ll.WithFields(ll.Fields{"Interface": ifName}).Tracef(
 				"Netlink fired: %v, admin: %v, OperState: %v, Rx/Tx: %v/%v",
 				ifName,
@@ -117,12 +123,6 @@ func main() {
 				link.Attrs().Statistics.RxPackets,
 				link.Attrs().Statistics.TxPackets,
 			)
-
-			if !e.Qualifies(ifName) {
-				ll.WithFields(ll.Fields{"Interface": ifName}).
-					Debugf("%s did not qualify, skipping...", ifName)
-				continue
-			}
 
 			tapExists := e.Exists(link.Attrs().Index)
 
