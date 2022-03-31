@@ -39,6 +39,16 @@ func getHostRoutesIpv6(ifIdx int) ([]*net.IPNet, []*net.IPNet, error) {
 	var hr []*net.IPNet
 	var sr []*net.IPNet
 	for _, d := range ro {
+		match := false
+		for _, e := range exclude {
+			if e.Contains(d.Dst.IP) {
+				match = true
+			}
+		}
+		if match {
+			continue
+		}
+
 		m, l := d.Dst.Mask.Size()
 		if m == 128 && l == 128 {
 			hr = append(hr, d.Dst)

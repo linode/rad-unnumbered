@@ -16,6 +16,7 @@ var (
 	flagLifeTime = flag.Duration("lifetime", (30 * time.Minute), "Lifetime (prefix valid time will be 3x lifetime).")
 	flagInterval = flag.Duration("interval", (5 * time.Minute), "Frequency of *un*solicitated RAs.")
 	errRetry     = errors.New("retry")
+	exclude      IPNets
 )
 
 var logLevels = map[string]func(){
@@ -36,9 +37,33 @@ func getLogLevels() []string {
 	return levels
 }
 
+type IPNets []net.IPNet
+
+func (i *IPNets) String() string {
+	var s string
+	for _, ip := range *i {
+		j, _ := ip.Mask.Size()
+		s = s + " " + fmt.Sprintf("%v/%v", ip.IP, j)
+	}
+	return s
+}
+
+func (i *IPNets) Set(value string) error {
+	ip, snet, err := net.ParseCIDR(value)
+	if err != nil {
+		return fmt.Errorf("invalid subnet: %v", value)
+	}
+	if ip.To4() != nil {
+		return fmt.Errorf("not a ipv6 subnet: %v", value)
+	}
+	*i = append(*i, *snet)
+	return nil
+}
+
 func main() {
 	flagLogLevel := flag.String("loglevel", "info", fmt.Sprintf("Log level. One of %v", getLogLevels()))
 	flagTapRegex := flag.String("regex", "tap.*_0", "regex to match interfaces.")
+	flag.Var(&exclude, "exclude", "subnet to be excluded from slaac advertisments")
 	flag.Parse()
 
 	ll.SetFormatter(&ll.TextFormatter{
@@ -55,6 +80,7 @@ func main() {
 	ll.Infoln("starting up...")
 	ll.Infof("Loglevel '%s'", ll.GetLevel())
 	ll.Infof("Sending RAs valid for %v every %v on interfaces matching %s", *flagLifeTime, *flagInterval, *flagTapRegex)
+	ll.Infof("Excluding %s from RAs", exclude)
 
 	if flagLifeTime.Seconds() < 3*(flagInterval.Seconds()) {
 		ll.Warnf(
