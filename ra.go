@@ -61,7 +61,7 @@ func (t Tap) sendLoop(ctx context.Context, c *ndp.Conn) error {
 		case <-ctx.Done():
 			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).
 				Debugf("%s sender closed, sent: %d advertisements", t.Ifi.Name, count)
-			return nil
+			return ctx.Err()
 		// Trigger RA at regular intervals or on demand.
 		case <-time.After(*flagInterval):
 		case <-t.rs:
@@ -77,7 +77,7 @@ func (t Tap) receiveLoop(ctx context.Context, c *ndp.Conn) error {
 		case <-ctx.Done():
 			ll.WithFields(ll.Fields{"Interface": t.Ifi.Name}).
 				Debugf("%s listener closed, received: %d solicits", t.Ifi.Name, count)
-			return nil
+			return ctx.Err()
 		default:
 		}
 
