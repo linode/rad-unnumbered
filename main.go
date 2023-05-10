@@ -147,14 +147,6 @@ func main() {
 				continue
 			}
 
-			if linkAttrs.Statistics == nil {
-				ll.WithFields(ll.Fields{"Interface": ifName}).Infof(
-					"Netlink fired: %v, admin: %v, OperState: %v",
-					ifName,
-					linkAttrs.Flags&net.FlagUp,
-					tapState,
-				)
-			}
 			ll.WithFields(ll.Fields{"Interface": ifName}).Tracef(
 				"Netlink fired: %v, admin: %v, OperState: %v",
 				ifName,
