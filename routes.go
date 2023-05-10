@@ -12,8 +12,10 @@ import (
 // there are certain aspects not fulfilled. (i.e. link local may not yet be assinged etc
 // it will also help on edge cases where the interface is not yet fully provisioned even though up
 func linkReady(l *netlink.LinkAttrs) bool {
-	if l.OperState == 6 && l.Flags&net.FlagUp == net.FlagUp && l.Statistics.TxPackets > 0 {
-		return true
+	if l.OperState == 6 && l.Flags&net.FlagUp == net.FlagUp {
+		if l.Statistics != nil && l.Statistics.TxPackets > 0 {
+			return true
+		}
 	}
 	return false
 }

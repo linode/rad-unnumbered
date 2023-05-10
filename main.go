@@ -132,8 +132,14 @@ func main() {
 		case <-linksDone:
 			ll.Fatalln("netlink feed ended")
 		case link := <-linksFeed:
-			ifName := link.Attrs().Name
-			tapState := link.Attrs().OperState
+			linkAttrs := link.Attrs()
+			if linkAttrs == nil {
+				ll.Tracef("Skipping unkown link: %s", link.Type())
+				continue
+			}
+
+			ifName := linkAttrs.Name
+			tapState := linkAttrs.OperState
 
 			if !e.Qualifies(ifName) {
 				ll.WithFields(ll.Fields{"Interface": ifName}).
@@ -142,20 +148,18 @@ func main() {
 			}
 
 			ll.WithFields(ll.Fields{"Interface": ifName}).Tracef(
-				"Netlink fired: %v, admin: %v, OperState: %v, Rx/Tx: %v/%v",
+				"Netlink fired: %v, admin: %v, OperState: %v",
 				ifName,
-				link.Attrs().Flags&net.FlagUp,
+				linkAttrs.Flags&net.FlagUp,
 				tapState,
-				link.Attrs().Statistics.RxPackets,
-				link.Attrs().Statistics.TxPackets,
 			)
 
-			tapExists := e.Exists(link.Attrs().Index)
+			tapExists := e.Exists(linkAttrs.Index)
 
-			if !tapExists && linkReady(link.Attrs()) {
-				e.Add(link.Attrs().Index)
-			} else if tapExists && !linkReady(link.Attrs()) {
-				e.Close(link.Attrs().Index)
+			if !tapExists && linkReady(linkAttrs) {
+				e.Add(linkAttrs.Index)
+			} else if tapExists && !linkReady(linkAttrs) {
+				e.Close(linkAttrs.Index)
 			} else {
 				ll.Tracef("%s Exists: %v, OperState: %s ... nothing to do?", ifName, tapExists, tapState)
 			}
