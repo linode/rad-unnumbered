@@ -13,7 +13,6 @@ import (
 
 // Tap is the interface object
 type Tap struct {
-	c      *ndp.Conn
 	Ifi    *net.Interface
 	ctx    context.Context
 	Close  context.CancelFunc
