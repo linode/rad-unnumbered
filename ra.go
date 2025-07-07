@@ -23,29 +23,29 @@ func (t Tap) doRA(c *ndp.Conn) error {
 
 // tiggers RouterAdvertisements every Interval duration or when a RouterSolicit was received on the interface
 func (t Tap) sendLoop(ctx context.Context, c *ndp.Conn) error {
-	var p *ndp.PrefixInformation
+	var options = []ndp.Option{
+		&ndp.LinkLayerAddress{
+			Direction: ndp.Source,
+			Addr:      t.Ifi.HardwareAddr,
+		},
+		ndp.NewMTU(uint32(t.Ifi.MTU)),
+	}
+
 	if t.Prefix != nil {
-		p = &ndp.PrefixInformation{
+		options = append(options, &ndp.PrefixInformation{
 			PrefixLength:                   64,
 			AutonomousAddressConfiguration: true,
 			ValidLifetime:                  3 * *flagLifeTime,
 			PreferredLifetime:              *flagLifeTime,
 			Prefix:                         t.Prefix,
-		}
+		})
 	}
 
 	m := &ndp.RouterAdvertisement{
 		CurrentHopLimit:           64,
 		RouterSelectionPreference: ndp.Medium,
 		RouterLifetime:            *flagLifeTime,
-		Options: []ndp.Option{
-			&ndp.LinkLayerAddress{
-				Direction: ndp.Source,
-				Addr:      t.Ifi.HardwareAddr,
-			},
-			ndp.NewMTU(uint32(t.Ifi.MTU)),
-			p,
-		},
+		Options:                   options,
 	}
 
 	// Send messages until cancelation or error.
