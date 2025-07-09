@@ -1,6 +1,6 @@
 module github.com/linode/rad-unnumbered
 
-go 1.23.1
+go 1.23
 
 require (
 	github.com/mdlayher/ndp v0.0.0-20210831201139-f982b8766fb5
