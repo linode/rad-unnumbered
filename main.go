@@ -12,7 +12,17 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+const (
+	omitMTU   = 0
+	deviceMTU = -1
+)
+
 var (
+	flagMTU = flag.Int(
+		"mtu",
+		omitMTU,
+		fmt.Sprintf("configure the MTU value that is sent.  %d (default) = disable MTU option, %d = use MTU of the interface device, >0 = send the provided value as the MTU option.", omitMTU, deviceMTU),
+	)
 	flagLifeTime = flag.Duration("lifetime", (30 * time.Minute), "Lifetime (prefix valid time will be 3x lifetime).")
 	flagInterval = flag.Duration("interval", (5 * time.Minute), "Frequency of *un*solicitated RAs.")
 	errRetry     = errors.New("retry")
@@ -81,6 +91,15 @@ func main() {
 	ll.Infof("Loglevel '%s'", ll.GetLevel())
 	ll.Infof("Sending RAs valid for %v every %v on interfaces matching %s", *flagLifeTime, *flagInterval, *flagTapRegex)
 	ll.Infof("Excluding %s from RAs", exclude)
+	if *flagMTU == deviceMTU {
+		ll.Infoln("MTU Option: interface determined")
+	} else if *flagMTU == omitMTU {
+		ll.Infoln("MTU Option disabled")
+	} else if *flagMTU > omitMTU {
+		ll.Infof("MTU Option: %v", *flagMTU)
+	} else {
+		ll.Infof("MTU Option: invalid value %d", *flagMTU)
+	}
 
 	if flagLifeTime.Seconds() < 3*(flagInterval.Seconds()) {
 		ll.Warnf(

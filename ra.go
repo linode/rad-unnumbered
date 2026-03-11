@@ -28,7 +28,12 @@ func (t Tap) sendLoop(ctx context.Context, c *ndp.Conn) error {
 			Direction: ndp.Source,
 			Addr:      t.Ifi.HardwareAddr,
 		},
-		ndp.NewMTU(uint32(t.Ifi.MTU)),
+	}
+
+	if *flagMTU == deviceMTU {
+		options = append(options, ndp.NewMTU(uint32(t.Ifi.MTU)))
+	} else if *flagMTU > omitMTU {
+		options = append(options, ndp.NewMTU(uint32(*flagMTU)))
 	}
 
 	if t.Prefix != nil {
